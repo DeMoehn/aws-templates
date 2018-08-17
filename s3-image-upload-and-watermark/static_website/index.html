@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>S3 Picture Upload & Watermark</title>
+        <script src="https://sdk.amazonaws.com/js/aws-sdk-2.294.0.min.js"></script>
+        <script src="config.js"></script>
+    </head>
+    <body>
+        <h1>S3 Picture Upload & Watermark</h1>
+
+        <h2>Upload File here</h2>
+        <div><span>Hint: </span><span id="hint">Start uploading a file</span></div><br />
+        <input id="file-chooser" type="file" accept="image/*"/><br /><br />
+        <img id="file-preview" src="no-preview.png" height="100px" alt="preview image" /><br /><br />
+        <button id="upload-button">Upload to S3</button>
+
+        <h2>Uploaded Pictures</h2>
+        <div id="results-info"></div><br />
+        <div id="results"></div>
+        <script src="app.js"></script>
+    </body>
+</html>
