@@ -30,3 +30,6 @@ jspm_packages/
 # Config files
 config.js
 *config.js
+
+# Packaged files
+packaged-*
