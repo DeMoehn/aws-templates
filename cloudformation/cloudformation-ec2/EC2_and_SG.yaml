@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates a simple EC2 Instance and a SecurityGroup
+
+# Input Parameter go here
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources
+    Type: String
+  KeyName:
+    Description: EC2 Key Pair for SSH Access
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: MyKeyPair
+    MinLength: 1
+    MaxLength: 64
+  InstanceTypeConfig:
+    Description: Choose instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: ["t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge"]
+    ConstraintDescription: must be a valid EC2 instance type.
+  ServerImageConfig:
+    Description: Choose AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-a058674b
+  SubnetConfig:
+    Description: Choose a Subnet
+    Type: AWS::EC2::Subnet::Id
+  CreateSecurityGroup:
+    Description: Create a new SecurityGroup (HTTP&SSH)?
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  VPCConfig:
+    Description: A VPC (needed for the SecurityGroup)
+    Type: AWS::EC2::VPC::Id
+  SecurityGroupConfig:
+    Description: Choose Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+
+# Design Metadata goes here
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "Environment Configuration"
+        Parameters: 
+          - EnvironmentName
+      - 
+        Label: 
+          default: "Amazon EC2 Configuration"
+        Parameters: 
+          - KeyName
+          - InstanceTypeConfig
+          - ServerImageConfig
+          - SubnetConfig
+          - CreateSecurityGroup
+          - VPCConfig
+          - SecurityGroupConfig
+    ParameterLabels: 
+      EnvironmentName:
+        default: "Project Name"
+      KeyName: 
+        default: "EC2 KeyPair"
+      InstanceTypeConfig: 
+        default: "EC2 Server"
+      ServerImageConfig:
+          default: "EC2 Server AMI"
+      SubnetConfig:
+        default: "Choose a Subnet"
+      CreateSecurityGroup:
+        default: "Create a Security Group with HTTP&SSH (true/false)"
+      VPCConfig:
+        default: "Choose a VPC to which the Security Group is linked"
+      SecurityGroupConfig:
+        default: "Choose own Security Group"
+
+# Any Conditions defined here
+Conditions: 
+  CreateSecurityGroupC: !Equals [ !Ref CreateSecurityGroup, true ]
+
+# All Resources go here
+Resources:
+ # SG HTTP & SSH
+  SecurityGroupSSHandHTTP:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateSecurityGroupC
+    Properties:
+      GroupName: !Sub http-ssh-${EnvironmentName}-sg
+      GroupDescription: "SSH & HTTP traffic in, all traffic out."
+      VpcId: !Ref VPCConfig
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'secG-SSHandHTTP-${EnvironmentName}'
+
+  # EC2 Instance
+  EC2Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: false
+      InstanceType: !Ref InstanceTypeConfig
+      ImageId: !Ref ServerImageConfig
+      KeyName: !Ref KeyName
+      Monitoring: false
+      SecurityGroupIds: 
+        - !If [CreateSecurityGroupC, !GetAtt SecurityGroupSSHandHTTP.GroupId,!Ref SecurityGroupConfig]
+      SubnetId: !Ref SubnetConfig 
+      Tags:
+      - Key: Name
+        Value: !Sub VM-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+
+# Outputs go here
+Outputs:
+  EC2DNS: 
+    Description: Reference to the EC2 DNS
+    Value: !GetAtt EC2Server.PrivateDnsName
+  SGID:
+    Description: Reference to the SecurityGroup ID
+    Value: !If [CreateSecurityGroupC, !GetAtt SecurityGroupSSHandHTTP.GroupId, !Ref SecurityGroupConfig]

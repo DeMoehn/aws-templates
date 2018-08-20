@@ -1,0 +1,487 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template deploys a VPC, with a pair of public and private subnets spread across two Availability Zones. It deploys an Internet Gateway, with a default route on the public subnets. It deploys a pair of NAT Gateways (one in each AZ), and default routes for them in the private subnets.
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources
+    Type: String
+  VpcCIDR: 
+    Description: IP range (CIDR notation) for the VPC
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnet1CIDR:
+    Description: IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.10.0/24
+  PublicSubnet2CIDR:
+    Description: IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.11.0/24
+  PrivateSubnet1CIDR:
+    Description: IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.20.0/24
+  PrivateSubnet2CIDR:
+    Description: IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.21.0/24
+  KeyName:
+    Description: EC2 Key Pair for SSH Access
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: MyKeyPair
+    MinLength: 1
+    MaxLength: 64
+  InstanceTypeConfig:
+    Description: Choose instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: ["t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge"]
+    ConstraintDescription: must be a valid EC2 instance type.
+  ServerImageConfig:
+    Description: Choose AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-a058674b
+  InstanceTypeAutoscale:
+    Description: Choose instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: ["t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge"]
+    ConstraintDescription: must be a valid EC2 instance type.
+  ServerImageAutoscale:
+    Description: Choose AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-0c7613dd420f1031e
+  LaunchConfigName:
+    Description: Name of the LaunchConfig
+    Type: String
+    Default: LaunchConfig
+  AutoScaleURL:
+    Description: Enter Healthcheck path (without "/")
+    Type: String
+    Default: index.html
+  AutoScaleUserData:
+    Description: Script executed at startup
+    Type: String
+    Default: |
+      #!/bin/bash 
+      cd /var/www/html 
+      MYIP=`ec2-metadata --local-ipv4 | cut -d " " -f 2` 
+      MYAZ=`ec2-metadata --availability-zone | cut -d " " -f 2` 
+      HTML='<html><body><h1>Webserver is running...</h1><h3>IP: '$MYIP'</h3><h3>Availability Zone: '$MYAZ'</h3></body></html>'
+      echo $HTML > index.html 
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "Environment Configuration"
+        Parameters: 
+          - EnvironmentName
+      -
+        Label: 
+          default: "Network Configuration"
+        Parameters: 
+          - VpcCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+      - 
+        Label: 
+          default: "Amazon EC2 Configuration"
+        Parameters: 
+          - KeyName
+          - InstanceTypeConfig
+          - ServerImageConfig
+          - InstanceTypeAutoscale
+          - ServerImageAutoscale
+          - LaunchConfigName
+          - AutoScaleURL
+          - AutoScaleUserData
+    ParameterLabels: 
+      EnvironmentName:
+        default: "Project Name"
+      VpcCIDR: 
+        default: "VPC CIDR"
+      PublicSubnet1CIDR: 
+        default: "Public Subnet 1 CIDR"
+      PublicSubnet2CIDR: 
+        default: "Public Subnet 2 CIDR"
+      PrivateSubnet1CIDR: 
+        default: "Private Subnet 1 CIDR"
+      PrivateSubnet2CIDR: 
+        default: "Private Subnet 2 CIDR"
+      KeyName: 
+        default: "EC2 KeyPair"
+      InstanceTypeConfig: 
+        default: "Bastion Server"
+      ServerImageConfig:
+          default: "Bastion Server AMI"
+      InstanceTypeAutoscale: 
+        default: "Autoscale Servers"
+      ServerImageAutoscale: 
+        default: "Autoscale Server AMI"
+      LaunchConfigName:
+        default: "LaunchConfig Name"
+      AutoScaleURL:
+        default: Healthcheck File
+      AutoScaleUserData:
+        default: Autoscale Script
+
+Resources:
+# VPC
+  MyVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: !Sub vpc-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  # Internet Gateway
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties: 
+      Tags:
+      - Key: Name
+        Value: !Sub igw-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref MyVPC
+
+# Subnets
+  # Public Subnets
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-public-1a'
+      - Key: Project
+        Value: !Ref EnvironmentName
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-public-1b'
+      - Key: Project
+        Value: !Ref EnvironmentName
+    # Private Subnets
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-private-1a'
+      - Key: Project
+        Value: !Ref EnvironmentName
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-private-1b'
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+# NAT Configuration
+  # NAT 1
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      Domain: vpc
+  NatGateway1: 
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+      - Key: Name
+        Value: !Sub 'nat1-${EnvironmentName}'
+  # NAT 2
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGateway2: 
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+      Tags:
+      - Key: Name
+        Value: !Sub 'nat2-${EnvironmentName}'
+
+# Route Tables
+  # Public Route
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC
+      Tags: 
+      - Key: Name 
+        Value: !Sub rtb-public-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  DefaultPublicRoute: 
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  # Private Route 1 (NAT 1)
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC
+      Tags: 
+      - Key: Name 
+        Value: !Sub rtb-private-1-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  # Private Route 2 (NAT 2)
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC
+      Tags: 
+      - Key: Name 
+        Value: !Sub rtb-private-2-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+# Security Groups
+  # SG HTTP & SSH
+  SecurityGroupSSHandHTTP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub http-ssh-${EnvironmentName}-sg
+      GroupDescription: "SSH & HTTP traffic in, all traffic out."
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'secG-SSHandHTTP-${EnvironmentName}'
+  # SG HTTP & SSH
+  SecurityGroupSSH:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ssh-${EnvironmentName}-sg
+      GroupDescription: "SSH traffic in, all traffic out."
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'secG-SSH-${EnvironmentName}'
+
+# EC2 Instance
+  BastionServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: false
+      InstanceType: !Ref InstanceTypeConfig
+      ImageId: !Ref ServerImageConfig
+      KeyName: !Ref KeyName
+      Monitoring: false
+      SecurityGroupIds: 
+        - !GetAtt SecurityGroupSSH.GroupId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+      - Key: Name
+        Value: !Sub BastionServer-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+# Loadbalancer & TargetGroup
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub Loadbalancer-${EnvironmentName}
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+      - !Ref PublicSubnet1
+      - !Ref PublicSubnet2
+      SecurityGroups:
+      - !Ref SecurityGroupSSHandHTTP
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '50'
+      Tags:
+      - Key: Name
+        Value: !Sub LoadbalancerTag-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub TargetGroup-${EnvironmentName}
+      HealthCheckIntervalSeconds: 30
+      UnhealthyThresholdCount: 5
+      HealthyThresholdCount: 3
+      HealthCheckTimeoutSeconds: 10
+      HealthCheckPath: !Sub /${AutoScaleURL}
+      HealthCheckProtocol: HTTP
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref MyVPC
+      TargetType: instance
+
+# Autoscaling
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref ServerImageAutoscale
+      KeyName: !Ref KeyName
+      LaunchConfigurationName: !Sub ${LaunchConfigName}-${EnvironmentName}
+      InstanceMonitoring: yes
+      UserData: 
+        Fn::Base64: !Ref AutoScaleUserData
+      SecurityGroups:
+      - !Ref SecurityGroupSSHandHTTP
+      InstanceType: !Ref InstanceTypeAutoscale
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub AutoScalingGroup-${EnvironmentName}
+      LaunchConfigurationName: !Ref LaunchConfig
+      VPCZoneIdentifier:
+      - !Ref PrivateSubnet1
+      - !Ref PrivateSubnet2
+      TargetGroupARNs: 
+      - !Ref ALBTargetGroup
+      MinSize: '2'
+      MaxSize: '4'
+      Tags:
+      - Key: Name
+        Value: !Sub AutoScaleServers-${EnvironmentName} 
+        PropagateAtLaunch: true
+      - Key: Project
+        Value: !Ref EnvironmentName
+        PropagateAtLaunch: true
+    
+    
+Outputs:
+  VPC: 
+    Description: Reference to the VPC
+    Value: !Ref MyVPC
+  PrimaryCidrBlock:
+    Description: The primaty CIDR block of the VPC
+    Value: !GetAtt MyVPC.CidrBlock
+  PublicSubnets:
+    Description: List of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+  PrivateSubnets:
+    Description: List of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+  PublicSubnet1:
+    Description: Reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+  PublicSubnet2: 
+    Description: Reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+  PrivateSubnet1:
+    Description: Reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+  PrivateSubnet2: 
+    Description: Reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+  SecurityGroupSSHandHTTP:
+    Description: Security group with HTTP & SSH
+    Value: !Ref SecurityGroupSSHandHTTP
+  SecurityGroupSSH:
+    Description: Security group with SSH
+    Value: !Ref SecurityGroupSSH
+  LoadBalancerDNS:
+    Description: DNS from LoadBalancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  # Outputs for EC2, Autoscaling, etc.
