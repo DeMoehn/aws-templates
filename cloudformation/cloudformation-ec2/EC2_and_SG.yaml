@@ -80,6 +80,7 @@ Metadata:
 # Any Conditions defined here
 Conditions: 
   CreateSecurityGroupC: !Equals [ !Ref CreateSecurityGroup, true ]
+  #SecurityGroupConfigExist: !Not [!Equals [ !Ref SecurityGroupConfig, "" ]]
 
 # All Resources go here
 Resources:
@@ -118,7 +119,7 @@ Resources:
       Monitoring: false
       SecurityGroupIds: 
         - !If [CreateSecurityGroupC, !GetAtt SecurityGroupSSHandHTTP.GroupId,!Ref SecurityGroupConfig]
-      SubnetId: !Ref SubnetConfig 
+      SubnetId: Ref SubnetConfig # !If [SecurityGroupConfigExist, !Ref SubnetConfig, "default"]
       Tags:
       - Key: Name
         Value: !Sub VM-${EnvironmentName}
