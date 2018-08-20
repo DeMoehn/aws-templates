@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates 2 S3 Buckets, 2 IAM Roles and a Cognito Identity Pool
+
+# Input Parameter go here
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources (lowercase only!)
+    Type: String
+    AllowedPattern: '[a-z]+'
+
+# All Resources go here
+Resources:
+  # S3 Buckets
+
+  # Static Website Bucket
+  S3PublicBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub ${EnvironmentName}-public-${AWS::AccountId}
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      CorsConfiguration:
+        CorsRules:
+        - AllowedHeaders: ['*']
+          AllowedMethods: [GET, HEAD]
+          AllowedOrigins: ['*']
+          Id: CORSrule01
+
+  BucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3PublicBucket
+                - /*
+      Bucket: !Ref S3PublicBucket
+  
+  # Private, Encyrpted Bucket
+  S3PrivateBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub ${EnvironmentName}-private-${AWS::AccountId}
+      AccessControl: BucketOwnerFullControl
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+        - AllowedHeaders: ['*']
+          AllowedMethods: [PUT, HEAD, POST]
+          AllowedOrigins: ['*']
+          Id: CORSrule01
+
+  # Lambda Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda_${EnvironmentName}_role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: !Sub lambda_basic-exec_${EnvironmentName}_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: !Sub lambda_s3-access_${EnvironmentName}_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource:
+            - !Sub ${S3PrivateBucket.Arn}
+            - !Sub ${S3PrivateBucket.Arn}/*
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:PutObjectAcl
+            Resource: !Sub ${S3PublicBucket.Arn}/*
+
+ # CognitoIdentity Pool
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub identityPool_${EnvironmentName}
+      AllowUnauthenticatedIdentities: true
+  
+  # IAM Role for unauthenticated Users
+  CognitoUnauthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub CognitoUnauth_${EnvironmentName}_role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Federated:
+            - cognito-identity.amazonaws.com
+          Action:
+          - sts:AssumeRoleWithWebIdentity
+          Condition:
+            StringEquals:
+              'cognito-identity.amazonaws.com:aud': !Ref CognitoIdentityPool
+            ForAnyValue:StringLike:
+              'cognito-identity.amazonaws.com:amr': unauthenticated
+
+      Path: "/"
+      Policies:
+      - PolicyName: !Sub CognitoUnauth_${EnvironmentName}_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:ListBucket
+            Resource:
+            - !Sub ${S3PublicBucket.Arn}
+            - !Sub ${S3PublicBucket.Arn}/*
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:PutObjectAcl
+            Resource: !Sub ${S3PrivateBucket.Arn}/*
+          - Effect: Allow
+            Action:
+            - mobileanalytics:PutEvents
+            - cognito-sync:*
+            Resource:
+            - "*"
+
+  #IdentityPool Role Attachment
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref CognitoIdentityPool
+      Roles: 
+        unauthenticated: !GetAtt CognitoUnauthRole.Arn
+
+
+# Outputs go here
+Outputs:
+  IdentityPoolId: 
+    Description: ID of the Identity Pool
+    Value: !Ref CognitoIdentityPool
+  CognitoRoleArn: 
+    Description: ARN of the Cognito Role
+    Value: !GetAtt CognitoUnauthRole.Arn
+  LambdaRoleArn: 
+    Description: ARN of the Lambda Role
+    Value: !GetAtt LambdaExecutionRole.Arn
+  StaticWebsiteURL:
+    Description: URL for the static webiste
+    Value: !GetAtt S3PublicBucket.WebsiteURL
+  StaticWebsiteBucketName:
+    Description: Name of the static webiste Bucket
+    Value: !Sub ${EnvironmentName}-public-${AWS::AccountId}
+  StaticWebsiteBucket:
+    Description: ARN of the static website Bucket
+    Value: !GetAtt S3PublicBucket.Arn
+  PrivateBucketName:
+    Description: Name of the private Bucket
+    Value: !Sub ${EnvironmentName}-private-${AWS::AccountId}
+  PrivateBucket:
+    Description: ARN of the private Bucket
+    Value: !GetAtt S3PrivateBucket.Arn
