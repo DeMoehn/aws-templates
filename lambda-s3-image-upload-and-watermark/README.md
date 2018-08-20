@@ -1,6 +1,6 @@
 # S3 Image Upload and Watermark
 
-- Uses AWS Lambda and an S3 Trigger to convert original images to resized, watermarkt images.
+- Uses AWS Lambda and an S3 Trigger to convert original images to resized, watermarked images.
 - Also includes a simple static HTML/JS website to upload and display images.
 
 ![Architecture](_img/s3-image-upload-and-watermark.png)
@@ -11,14 +11,14 @@
 
 You can either use:
 
-1. Only the Lambda, including: AWS Lambda Function, 2 S3 Buckets, 1 IAM Policy, where you manually put objects in the S3 Bucket and the Lambda converts them.
-2. The Lambda with a static-website: adding AWS Cognito + another IAM role, allowing you to upload & view the image in the Browser.
+1. Only the Lambda, including: 1 AWS Lambda Function, 2 S3 Buckets, 1 IAM Policy, where you manually put objects in the S3 Bucket and the Lambda converts them. (lambda_only.yaml)
+2. The Lambda with a static-website: adding AWS Cognito + another IAM role, allowing you to upload & view the image in the Browser. (lambda_and_static.yaml)
 
 You need to decide between 1. or 2. and then pick the right CloudFormation template / steps to follow.
 
 ### CloudFormation Templates / Steps
 
-This CloudFormation creates:
+#### This CloudFormation creates:
 
 - An IAM role for basic Lambda Execution and S3 Access: *"lambda_<ENVIRONMENT_NAME>_role"*
 - A private, SSE AES256 encrypted S3 Bucket: *"<ENVIRONMENT_NAME>-private-<AWS_ACCOUNT-ID>"*
@@ -26,7 +26,7 @@ This CloudFormation creates:
 - A Cognito Identity Pool *(only with lambda_and_static.yaml)*
 - An IAM role for Cognito with write access to the private S3 Bucket and read access from the public S3 Bucket *(only with lambda_and_static.yaml)*
 
-Use the following commands:
+#### Use the following commands:
 
 - Go to the Folder *"cloudformation/"* and start a new Terminal
 - Use the code below to create the CloudFormation stack (or use the AWS Console UI)
