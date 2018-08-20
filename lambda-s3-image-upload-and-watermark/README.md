@@ -31,7 +31,7 @@ You need to decide between 1. or 2. and then pick the right CloudFormation templ
 - Go to the Folder *"cloudformation/"* and start a new Terminal
 - Use the code below to create the CloudFormation stack (or use the AWS Console UI)
 - Use `lambda_only.yaml` or `lambda_and_static.yaml` to replace <CF_FILE>
-- Replace \<STACK_NAME> and \<ENVIRONMENT_NAME_LOWERCASE> <small>(Environment Name needs to be lowercase, and only use: aA-)</small>
+- Replace \<STACK_NAME> and \<ENVIRONMENT_NAME_LOWERCASE> <small>(Environment Name needs to be lowercase only [a-z])</small>
 - Code:
 
 ``` bash
@@ -61,7 +61,7 @@ aws lambda create-function --function-name <FUNCTION_NAME> \
 --handler index.handler \
 --runtime nodejs6.10 \
 --timeout 30 --memory-size 512 \
---description 'A Lambda function that resizes and watermarks images from an S3 folder' \
+--description 'A Lambda function that resizes and watermarks images from an S3 Bucket' \
 --environment Variables='{BUCKET_FOLDER_PUBLIC=img,S3_BUCKET_PUBLIC=<StaticWebsiteBucketName>}' \
 --tags Author='<AUTHOR>'
 ```
@@ -104,8 +104,7 @@ aws s3api put-bucket-notification-configuration \
 - First go to *"static_website/"* Folder, open *"config.example.js"* and enter all the needed Information <small>(You can find all the information in your CloudFormation Output)</small>
 - Now rename the File from *"config.example.js"* to *"config.js"* <small>(Remove: ".example")</small>
 - Go to the Folder *"static_website/"* and open a new Terminal window
-- Use: `aws s3 cp . s3://newstackk-public-734714341240 --recursive` to upload all Files in the Folder to the Static Website S3 Bucket <small>(You may use `--dryrun` first if you're not sure if you're in the right directory)</small>
-- You can now access the Static Website via the *"StaticWebsiteURL"* <small>(You can find the URL in your CloudFormation Output)</small>
-- URL should be: *"http://\<BUCKET-NAME>.s3-website.\<REGION>.amazonaws.com"*
+- Use: `aws s3 cp . s3://<StaticWebsiteBucketName> --recursive` to upload all Files in the Folder to the Static Website S3 Bucket <small>(You may use `--dryrun` first if you're not sure if you're in the right directory)</small>
+- You can now access the Static Website via the *"StaticWebsiteURL"* <small>(You can find the URL in your CloudFormation Outputor use: *"http://\<BUCKET-NAME>.s3-website.\<REGION>.amazonaws.com"*)</small> 
 
 ![Static Website Screenshot](_img/static_website_screenshot.png)
