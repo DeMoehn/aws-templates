@@ -1,0 +1,113 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: readALBlogsServerless # NOTE: update this with your service name
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  region: eu-central-1 
+  iamRoleStatements:
+    -  Effect: "Allow"
+       Action:
+         - "s3:PutBucketNotification"
+       Resource:
+         Fn::Join:
+           - ""
+           - - "arn:aws:s3:::smoehn-alb-logs"
+
+# you can define service wide environment variables here
+
+
+plugins:
+ - serverless-plugin-existing-s3 # https://github.com/matt-filion/serverless-external-s3-event
+
+# define functions here
+functions:
+  getELBlogs:
+    handler: handler.getELBlogs
+    description: Reads ALB Logs and sends them via SNS to an E-Mail
+    memorySize: 512 # Overwrite the default memory size. Default is 1024
+    timeout: 10 # The default is 6 seconds. Note: API Gateway current maximum is 30 seconds
+    role: arn:aws:iam::734714341240:role/lambda_readALBlogs
+    environment:
+      SNS_TOPIC: arn:aws:sns:eu-central-1:734714341240:notifyNewALBLog
+      EC2_DNS: ${cf:another-stack.EC2DNS}
+    events:
+      - existingS3:
+          bucket: smoehn-alb-logs
+          events: 
+            - s3:ObjectCreated:*
+          rules:
+            - prefix: simpleWebLB/AWSLogs/734714341240/elasticloadbalancing/eu-central-1/
+
+# All Resources go here
+resources:
+  Resources:
+  # SG HTTP & SSH
+    SecurityGroupSSHandHTTP:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupName: http-ssh-simple-EC2-sg
+        GroupDescription: "SSH & HTTP traffic in, all traffic out."
+        VpcId: vpc-071a4c6c
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '22'
+            ToPort: '22'
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: '80'
+            ToPort: '80'
+            CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+          - IpProtocol: -1
+            CidrIp: 0.0.0.0/0
+        Tags:
+        - Key: Name
+          Value: 'secG-SSHandHTTP-simple-EC2'
+
+    # EC2 Instance
+    EC2Server:
+      Type: AWS::EC2::Instance
+      Properties:
+        DisableApiTermination: false
+        InstanceType: t2.micro
+        ImageId: ami-7c4f7097
+        KeyName: smoehn-kp
+        Monitoring: false
+        SecurityGroupIds: 
+        - Fn::GetAtt: [ SecurityGroupSSHandHTTP, GroupId ]
+        SubnetId: subnet-4df9fc26
+        Tags:
+        - Key: Name
+          Value: VM-simple-EC2
+        - Key: Project
+          Value: simple-EC2
+
+
+  # Outputs go here
+  Outputs:
+    EC2DNS: 
+      Description: Reference to the EC2 DNS
+      Value: 
+        Fn::GetAtt: [ EC2Server, PrivateDnsName ]
+    SGID:
+      Description: Reference to the SecurityGroup ID
+      Value: 
+        Fn::GetAtt: [ SecurityGroupSSHandHTTP, GroupId ]

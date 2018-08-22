@@ -1,0 +1,4 @@
+sls deploy
+sls s3deploy
+serverless deploy function -f getELBlogs
+serverless invoke -f getELBlogs -p event.json -l

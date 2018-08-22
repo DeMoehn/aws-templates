@@ -76,10 +76,4 @@ aws cloudformation deploy --stack-name <STACK_NAME> \
         }
     }
     ```
-
 - Make sure the Trigger is enabled and click "Add"
-
-### Test the function
-
-- Go to the AWS EC2 Service and launch an Instance
-- Click on the newly created Instance and to the the "Tags" Tab, you should see a Tag for "Owner" and for "Launched"

@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
 Description: Creates 2 S3 Buckets, 2 IAM Roles and a Cognito Identity Pool
 
 # Input Parameter go here
@@ -7,11 +8,11 @@ Parameters:
     Description: Will be used as name for all Resources (lowercase only!)
     Type: String
     AllowedPattern: '[a-z]+'
-
+    
 # All Resources go here
 Resources:
-  # S3 Buckets
 
+  # S3 Buckets
   # Static Website Bucket
   S3PublicBucket:
     Type: 'AWS::S3::Bucket'
@@ -95,14 +96,14 @@ Resources:
           - Effect: Allow
             Action:
             - s3:GetObject
-            Resource:
-            - !Sub ${S3PrivateBucket.Arn}
-            - !Sub ${S3PrivateBucket.Arn}/*
+            Resource: 
+            - !Sub arn:aws:s3:::${EnvironmentName}-private-${AWS::AccountId} # We need to do this here instead of: ${S3PrivateBucket.Arn} because we have a circular dependency with the Lambda, S3 and the Role
+            - !Sub arn:aws:s3:::${EnvironmentName}-private-${AWS::AccountId}/*
           - Effect: Allow
             Action:
             - s3:PutObject
             - s3:PutObjectAcl
-            Resource: !Sub ${S3PublicBucket.Arn}/*
+            Resource: !Sub arn:aws:s3:::${EnvironmentName}-public-${AWS::AccountId}/*
 
  # CognitoIdentity Pool
   CognitoIdentityPool:
@@ -164,9 +165,32 @@ Resources:
       Roles: 
         unauthenticated: !GetAtt CognitoUnauthRole.Arn
 
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub lambda_${EnvironmentName}
+      Handler: index.handler
+      Runtime: nodejs6.10
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt LambdaExecutionRole.Arn
+      CodeUri: '../lambda_function/'
+      Environment:
+        Variables:
+          BUCKET_FOLDER_PUBLIC: 'img'
+          S3_BUCKET_PUBLIC: !Sub ${EnvironmentName}-public-${AWS::AccountId}
+      Events:
+        S3:
+          Type: S3
+          Properties:
+            Bucket: !Ref S3PrivateBucket
+            Events: s3:ObjectCreated:*
 
 # Outputs go here
 Outputs:
+  LambdaFunctionName:
+    Description: Name of the Lambda Function
+    Value: !Ref LambdaFunction
   IdentityPoolId: 
     Description: ID of the Identity Pool
     Value: !Ref CognitoIdentityPool

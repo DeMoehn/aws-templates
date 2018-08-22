@@ -1,0 +1,38 @@
+{
+    "Records": [
+      {
+        "eventVersion": "2.0",
+        "eventSource": "aws:s3",
+        "awsRegion": "eu-central-1",
+        "eventTime": "2018-08-09T14:10:10.671Z",
+        "eventName": "ObjectCreated:Put",
+        "userIdentity": {
+          "principalId": "AWS:AIDAIGT44FX3WNLZFYFZK"
+        },
+        "requestParameters": {
+          "sourceIPAddress": "52.28.99.30"
+        },
+        "responseElements": {
+          "x-amz-request-id": "CC2E565B5A94B5AF",
+          "x-amz-id-2": "bwohfNwoBIQQ+6lz/65wpzJV/WcfoXjdaRNx+8B3SUijgew/Q8m29Iby4nyoUv3Ye/qF+NTKz9Y="
+        },
+        "s3": {
+          "s3SchemaVersion": "1.0",
+          "configurationId": "4a91335e-30d8-4abe-9c6a-263e1bcff239",
+          "bucket": {
+            "name": "smoehn-alb-logs",
+            "ownerIdentity": {
+              "principalId": "A4NM4FX3PWZI3"
+            },
+            "arn": "arn:aws:s3:::smoehn-alb-logs"
+          },
+          "object": {
+            "key": "simpleWebLB/AWSLogs/734714341240/elasticloadbalancing/eu-central-1/2018/08/09/734714341240_elasticloadbalancing_eu-central-1_app.simpleWebLB.a18ab38ad75a70c0_20180809T1425Z_52.58.135.233_6c9pvmen.log.gz",
+            "size": 366,
+            "eTag": "e0a5f0853b4fc24f16dc93a727f9a118",
+            "sequencer": "005B6C4B42972D3B2C"
+          }
+        }
+      }
+    ]
+  }

@@ -1,0 +1,15 @@
+{
+  "name": "sendsns",
+  "version": "1.0.0",
+  "description": "Fetches ALB Logs and sends an E-Mail via SNS",
+  "main": "handler.js",
+  "scripts": {
+    "test": "node handler.js"
+  },
+  "author": "Sebastian Moehn",
+  "license": "ISC",
+  "dependencies": {
+    "serverless-plugin-existing-s3": "^2.2.2",
+    "zlib": "^1.0.5"
+  }
+}

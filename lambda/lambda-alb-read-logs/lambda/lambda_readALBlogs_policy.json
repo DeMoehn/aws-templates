@@ -1,0 +1,18 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "sns:Publish"
+            ],
+            "Resource": [
+                "arn:aws:sns:eu-central-1:734714341240:notifyNewALBLog",
+                "arn:aws:s3:::/smoehn-alb-logs",
+                "arn:aws:s3:::smoehn-alb-logs/simpleWebLB/AWSLogs/734714341240/elasticloadbalancing/eu-central-1/*"
+            ]
+        }
+    ]
+}
