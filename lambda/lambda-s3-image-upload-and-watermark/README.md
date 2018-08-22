@@ -7,6 +7,10 @@
 
 ## How to use
 
+### Get the code
+
+- Use `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda/lambda-s3-image-upload-and-watermark` to download the contents
+
 ### Create with CloudFormation template
 
 #### This CloudFormation creates
