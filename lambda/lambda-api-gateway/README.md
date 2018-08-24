@@ -1,6 +1,6 @@
 # Lambda and API Gateway
 
-This Sample consists of ab AWS API Gateway and a Lambda Function to show how to build a custom API
+This Sample consists of an AWS API Gateway and a Lambda Function to show how to build a custom API
 
 ![Architecture](_img/lambda-api-gateway.png)
 
@@ -8,7 +8,7 @@ This Sample consists of ab AWS API Gateway and a Lambda Function to show how to 
 
 ### Get the data
 
-- Use: `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda-api-gateway` to download the folder to a local directory
+- Use: `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda/lambda-api-gateway` to download the folder to a local directory
 
 ### Create the whole Stack
 

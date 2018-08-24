@@ -8,7 +8,7 @@ This Lambda function uses CloudWatch Events to tag newly created EC2 Instance wi
 
 ### Get the data
 
-- Use: `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda-tag-ec2` to download the folder to a local directory
+- Use: `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda/lambda-api-gateway` to download the folder to a local directory
 
 ### Deploy the function
 
