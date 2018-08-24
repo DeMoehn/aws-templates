@@ -2,7 +2,7 @@
 
 This Sample consists of ab AWS API Gateway and a Lambda Function to show how to build a custom API
 
-![Architecture](_img/lambda-tag-ec2.png) #Change
+![Architecture](_img/lambda-api-gateway.png)
 
 ## How to use
 
