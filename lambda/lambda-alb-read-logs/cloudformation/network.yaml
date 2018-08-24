@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template deploys 1 VPC, 2 public and 2 private subnets and 1 IGW
+
+# Parameter go here
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources
+    Type: String
+  VpcCIDR: 
+    Description: IP range (CIDR notation) for the VPC
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnet1CIDR:
+    Description: IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.10.0/24
+  PublicSubnet2CIDR:
+    Description: IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.11.0/24
+  PrivateSubnet1CIDR:
+    Description: IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.20.0/24
+  PrivateSubnet2CIDR:
+    Description: IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.21.0/24
+
+# Resources go here
+Resources:
+# VPC
+  MyVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: !Sub vpc-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  # Internet Gateway
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties: 
+      Tags:
+      - Key: Name
+        Value: !Sub igw-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref MyVPC
+
+# Subnets
+  # Public Subnets
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-public-1a'
+      - Key: Project
+        Value: !Ref EnvironmentName
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-public-1b'
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+  # Private Subnets
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-private-1a'
+      - Key: Project
+        Value: !Ref EnvironmentName
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      Tags:
+      - Key: Name
+        Value: !Sub 'sub-${EnvironmentName}-private-1b'
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+# Route Tables
+  # Public Route
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC
+      Tags: 
+      - Key: Name 
+        Value: !Sub rtb-public-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+  DefaultPublicRoute: 
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+ # Output goes here 
+Outputs:
+  VPC: 
+    Description: Reference to the VPC ID
+    Value: !Ref MyVPC
+  PublicSubnet1:
+    Description: Reference to the public subnet ID in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+  PublicSubnet2: 
+    Description: Reference to the public subnet ID in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+  PrivateSubnet1:
+    Description: Reference to the private subnet ID in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+  PrivateSubnet2: 
+    Description: Reference to the private subnet ID in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+  PublicSubnet1AZ:
+    Description: Reference to the public subnet AZ in the 1st Availability Zone
+    Value: !GetAtt PublicSubnet1.AvailabilityZone
+  PublicSubnet2AZ: 
+    Description: Reference to the public subnet AZ in the 2nd Availability Zone
+    Value: !GetAtt PublicSubnet2.AvailabilityZone
+  PrivateSubnet1AZ:
+    Description: Reference to the private subnet AZ in the 1st Availability Zone
+    Value: !GetAtt PrivateSubnet1.AvailabilityZone
+  PrivateSubnet2AZ: 
+    Description: Reference to the private subnet AZ in the 2nd Availability Zone
+    Value: !GetAtt PrivateSubnet2.AvailabilityZone
+  PublicRouteTable:
+    Description: Reference to the Public Route Table ID
+    Value: !Ref PublicRouteTable
+  InternetGateway:
+    Description: Reference to the Internet Gateway ID
+    Value: !Ref InternetGateway

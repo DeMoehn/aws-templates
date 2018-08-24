@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template deploys 2 SecurityGroups (1 for HTTP and SSH access and 1 for SSH access only)
+
+# Parameter go here
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources
+    Type: String
+  VpcId:
+    Description: The VPC id, the Security Groups belong to
+    Type: String
+
+#Resources go here
+Resources:
+  # SG HTTP & SSH
+  SecurityGroupSSHandHTTP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub http-ssh-${EnvironmentName}-sg
+      GroupDescription: "SSH & HTTP traffic in, all traffic out."
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'secG-SSHandHTTP-${EnvironmentName}'
+
+  # SG HTTP & SSH
+  SecurityGroupSSH:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ssh-${EnvironmentName}-sg
+      GroupDescription: "SSH traffic in, all traffic out."
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'secG-SSH-${EnvironmentName}'
+
+Outputs:
+  SecurityGroupSSHandHTTP:
+    Description: Security group with HTTP & SSH
+    Value: !GetAtt SecurityGroupSSHandHTTP.GroupId
+  SecurityGroupSSH:
+    Description: Security group with SSH
+    Value: !GetAtt SecurityGroupSSH.GroupId

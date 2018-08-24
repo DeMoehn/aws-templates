@@ -8,7 +8,7 @@ AWS.config.region = process.env.AWS_REGION;
 var s3 = new AWS.S3();
 var sns = new AWS.SNS();
 
-exports.getELBlogs = function(event, context) {  
+exports.handler = function(event, context) {  
     console.log("Loading handler...");
     var objBucket = event.Records[0].s3.bucket.name;
     var objPath = event.Records[0].s3.object.key;

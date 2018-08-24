@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This Template deploys 1 ALB with 1 TargetGroup, 1 AutoScalingGroup with 1 LaunchConfiguration and 2 SecurityGroups
+
+# Input Parameter go here
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources (lowercase, 10 characters only!)
+    Type: String
+    AllowedPattern: '[a-z]+'
+    MaxLength: 10
+    ConstraintDescription: Environment name is, among others, used for components like S3 and SNS and can therefore only use lowercase and 10 characters.
+  SNSSubMail:
+    Description: E-Mail that gets notified via SNS
+    Type: String
+
+# All Resources go here
+Resources:
+  # Network Stack
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./network.yaml
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        # VpcCIDR: 
+        # PublicSubnet1CIDR:  
+        # PublicSubnet2CIDR:
+        # PrivateSubnet1CIDR:
+        # PrivateSubnet2CIDR:
+
+  # Security Stack
+  SecurityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./security.yaml
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt NetworkStack.Outputs.VPC
+  
+  # Infrastructure Stack
+  InfrastructureStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./packaged-infrastructure.yaml
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        KeyName: 'smoehn-kp'
+        #InstanceTypeAutoscale:
+        #ServerImageAutoscale:
+        #LaunchConfigName:
+        #AutoScaleURL:
+        #AutoScaleUserData:
+        VPC: !GetAtt NetworkStack.Outputs.VPC
+        ApplicationLoadBalancerSubnet1: !GetAtt NetworkStack.Outputs.PublicSubnet1
+        ApplicationLoadBalancerSubnet2: !GetAtt NetworkStack.Outputs.PublicSubnet2
+        AutoScalingGroupSubnet1: !GetAtt NetworkStack.Outputs.PrivateSubnet1
+        AutoScalingGroupSubnet2: !GetAtt NetworkStack.Outputs.PrivateSubnet2
+        SecurityGroupApplicationLoadBalancer: !GetAtt SecurityStack.Outputs.SecurityGroupSSHandHTTP
+        SecurityGroupLaunchConfig: !GetAtt SecurityStack.Outputs.SecurityGroupSSHandHTTP
+        SNSSubscriptionMail: !Ref SNSSubMail
+
+Outputs:
+  NetworkStack: 
+    Description: Reference to the Network Stack
+    Value: !Ref NetworkStack
+  SecurityStack:
+    Description: Reference to the Security Stack
+    Value: !Ref SecurityStack
+  InfrastructureStack:
+    Description: Reference to the Security Stack
+    Value: !Ref InfrastructureStack

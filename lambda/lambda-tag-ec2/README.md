@@ -37,9 +37,9 @@ aws cloudformation deploy --stack-name <STACK_NAME> \
 - Login to your AWS Console: https://console.aws.amazon.com
 - Go to the AWS IAM Service
 - Create a new Role for AWS Lambda, name it something like: "lambda_tag-EC2_role"
-- Add the "AWSLambdaBasicExecutionRole"
+- Add the "AWSLambdaBasicExecutionRole" Policy
 - Create a new Policy and allow the Creation of EC2 Tags (`Action: 'ec2:CreateTags'`) for any Resource (`Resource: '*'`)
-- Add the Policy to the Role
+- Add the Policy to the Role ("lambda_tag-EC2_role")
 
 ### Create the Lambda
 

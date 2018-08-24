@@ -1,0 +1,283 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This Template deploys 1 S3 Bucket with Policy for ALB Logs, 1 ALB with 1 TargetGroup, 1 AutoScalingGroup with 1 LaunchConfiguration
+
+# Parameters go here
+Parameters:
+  EnvironmentName:
+    Description: Will be used as name for all Resources (lowercase only!)
+    Type: String
+    AllowedPattern: '[a-z]+'
+  KeyName:
+    Description: EC2 Key Pair for SSH Access
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: MyKeyPair
+    MinLength: 1
+    MaxLength: 64
+  InstanceTypeAutoscale:
+    Description: Choose instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues: ["t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge"]
+    ConstraintDescription: must be a valid EC2 instance type.
+  ServerImageAutoscale:
+    Description: Choose AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-0c7613dd420f1031e
+  LaunchConfigName:
+    Description: Name of the LaunchConfig
+    Type: String
+    Default: LaunchConfig
+  AutoScaleURL:
+    Description: Enter Healthcheck path (without "/")
+    Type: String
+    Default: index.html
+  AutoScaleUserData:
+    Description: Script executed at startup
+    Type: String
+    Default: |
+      #!/bin/bash 
+      cd /var/www/html 
+      MYIP=`ec2-metadata --local-ipv4 | cut -d " " -f 2` 
+      MYAZ=`ec2-metadata --availability-zone | cut -d " " -f 2` 
+      HTML='<html><body><h1>Webserver is running...</h1><h3>IP: '$MYIP'</h3><h3>Availability Zone: '$MYAZ'</h3></body></html>'
+      echo $HTML > index.html
+  VPC:
+    Description: VPC for the TargetGroup
+    Type: String
+  ApplicationLoadBalancerSubnet1:
+    Description: Subnet 1 for the ALB
+    Type: String
+  ApplicationLoadBalancerSubnet2:
+    Description: Subnet 2 for the ALB
+    Type: String
+  AutoScalingGroupSubnet1:
+    Description: Subnet 1 for the AutoScaling Group
+    Type: String
+  AutoScalingGroupSubnet2:
+    Description: Subnet 2 for the AutoScaling Group
+    Type: String
+  SecurityGroupApplicationLoadBalancer:
+    Description: SecurityGroup for the ALB
+    Type: String
+  SecurityGroupLaunchConfig:
+    Description: SecurityGroup for the Launch Configuration
+    Type: String
+  SNSSubscriptionMail:
+    Description: E-Mail that gets notified via SNS
+    Type: String
+
+Resources:
+  # SNS Topic
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties: 
+      DisplayName: !Sub sns_${EnvironmentName}
+      TopicName: !Ref EnvironmentName
+  
+  SNSSubscription:
+    Type: "AWS::SNS::Subscription"
+    Properties:
+      Endpoint: !Ref SNSSubscriptionMail
+      Protocol: email
+      TopicArn: !Ref SNSTopic
+
+  # Lambda Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda_${EnvironmentName}_role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: !Sub lambda_basic-exec_${EnvironmentName}_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: !Sub lambda_s3-access_${EnvironmentName}_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource: 
+            - !Sub arn:aws:s3:::${EnvironmentName}-alb-logs-${AWS::AccountId}
+            - !Sub arn:aws:s3:::${EnvironmentName}-alb-logs-${AWS::AccountId}/*
+      - PolicyName: !Sub lambda_sns-access_${EnvironmentName}_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - sns:Publish
+            Resource: arn:aws:sns:eu-central-1:734714341240:nands
+  
+  # Lambda Function      
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties: 
+      FunctionName: !Sub lambda_${EnvironmentName}
+      Description: Lambda Function that reads ALB logs
+      Code: '../lambda/'
+      Runtime: nodejs6.10
+      Handler: index.handler
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          SNS_TOPIC: !Ref SNSTopic
+
+  # Permission for Lambda Function
+  LambdaFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunction
+      Principal: s3.amazonaws.com 
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:aws:s3:::${EnvironmentName}-alb-logs-${AWS::AccountId}
+
+  # S3 Bucket for Logs
+  ALBlogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${EnvironmentName}-alb-logs-${AWS::AccountId}
+      NotificationConfiguration:
+        LambdaConfigurations:
+        - Function: !GetAtt LambdaFunction.Arn
+          Event: "s3:ObjectCreated:*"
+
+  # Bucket Policy
+  ALBlogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ALBlogBucket
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowALBtoWrite
+            Effect: Allow
+            Principal: 
+              AWS: arn:aws:iam::054676820928:root # Account ID for eu-central-1 LoadBalancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-logging-bucket-permissions)   
+            Action: s3:PutObject
+            Resource: !Sub arn:aws:s3:::${ALBlogBucket}/lb-logs-${EnvironmentName}/AWSLogs/${AWS::AccountId}/* 
+
+  # Application-Loadbalancer & TargetGroup
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: ALBlogBucketPolicy
+    Properties:
+      Name: !Sub Loadbalancer-${EnvironmentName}
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+      - !Ref ApplicationLoadBalancerSubnet1
+      - !Ref ApplicationLoadBalancerSubnet2
+      SecurityGroups:
+      - !Ref SecurityGroupApplicationLoadBalancer
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '50'
+      - Key: access_logs.s3.enabled
+        Value: true
+      - Key: access_logs.s3.bucket
+        Value: !Ref ALBlogBucket
+      - Key: access_logs.s3.prefix
+        Value: !Sub lb-logs-${EnvironmentName}
+      Tags:
+      - Key: Name
+        Value: !Sub LoadbalancerTag-${EnvironmentName}
+      - Key: Project
+        Value: !Ref EnvironmentName
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub TargetGroup-${EnvironmentName}
+      HealthCheckIntervalSeconds: 30
+      UnhealthyThresholdCount: 5
+      HealthyThresholdCount: 3
+      HealthCheckTimeoutSeconds: 10
+      HealthCheckPath: !Sub /${AutoScaleURL}
+      HealthCheckProtocol: HTTP
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: instance
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Autoscaling
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref ServerImageAutoscale
+      KeyName: !Ref KeyName
+      LaunchConfigurationName: !Sub ${LaunchConfigName}-${EnvironmentName}
+      InstanceMonitoring: yes
+      UserData: 
+        Fn::Base64: !Ref AutoScaleUserData
+      SecurityGroups:
+      - !Ref SecurityGroupLaunchConfig
+      InstanceType: !Ref InstanceTypeAutoscale
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub AutoScalingGroup-${EnvironmentName}
+      LaunchConfigurationName: !Ref LaunchConfig
+      VPCZoneIdentifier:
+      - !Ref AutoScalingGroupSubnet1
+      - !Ref AutoScalingGroupSubnet2
+      TargetGroupARNs: 
+      - !Ref ALBTargetGroup
+      MinSize: '2'
+      MaxSize: '4'
+      Tags:
+      - Key: Name
+        Value: !Sub AutoScaleServers-${EnvironmentName} 
+        PropagateAtLaunch: true
+      - Key: Project
+        Value: !Ref EnvironmentName
+        PropagateAtLaunch: true
+
+Outputs:
+  ALBlogBucket:
+    Description: The S3 Bucket ARN
+    Value: !GetAtt ALBlogBucket.Arn
+  ALBlogBucketName:
+    Description: The S3 Bucket Name
+    Value: !Ref ALBlogBucket
+  ApplicationLoadBalancer:
+    Description: The ALB ARN
+    Value: !Ref ApplicationLoadBalancer
+  LambdaFunction: 
+    Description: Reference to the Lambda Function
+    Value: !Ref LambdaFunction
+  SNSTopic:
+    Description: Reference to the SNS Topic
+    Value: !Ref SNSTopic
