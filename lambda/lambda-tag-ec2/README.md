@@ -77,3 +77,5 @@ aws cloudformation deploy --stack-name <STACK_NAME> \
     }
     ```
 - Make sure the Trigger is enabled and click "Add"
+- Your Lambda is finished now, click "Save"
+- You can now test the Lambda function by creating a new EC2 instance and check if it gets tagged with an "Owner" and "Launched" Tag
