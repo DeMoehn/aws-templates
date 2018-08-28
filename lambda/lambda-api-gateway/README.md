@@ -8,7 +8,8 @@ This Sample consists of an AWS API Gateway and a Lambda Function to show how to 
 
 ### Get the data
 
-- Use: `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda/lambda-api-gateway` to download the folder to a local directory
+- Get the complete GitHub Folder with this link: https://github.com/DeMoehn/aws-templates/archive/master.zip
+- Or download only this folder with: `svn export https://github.com/DeMoehn/aws-templates/trunk/lambda/lambda-api-gateway` to download the folder to a local directory
 
 ### Create the whole Stack
 
