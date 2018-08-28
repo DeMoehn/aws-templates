@@ -25,7 +25,7 @@ The final solution should be an AWS Lambda Function that tags new EC2 Instances 
 
 ### Deploy the function
 
-- Package the template (uploads the Skript to S3 and creates a valid CloudFormation template)
+- Package the template (uploads the script to S3 and creates a valid CloudFormation template)
 - Replace \<S3-BUCKET> with an S3 Bucket where the Script can be stored. You can use `aws s3 mb s3://<S3_BUCKET>` to create a new one
 
 ``` bash
