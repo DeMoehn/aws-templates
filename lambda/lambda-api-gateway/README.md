@@ -4,6 +4,19 @@ This Sample consists of an AWS API Gateway and a Lambda Function to show how to 
 
 ![Architecture](_img/lambda-api-gateway.png)
 
+## Objective
+
+The final solution should be a simple API Endpoint (/) that replies with "Hello from Lambda".
+
+- Create an AWS API Gateway with a simple "/" GET Endpoint that invokes a Lambda Function
+  - See: https://docs.aws.amazon.com/apigateway/
+  - Use the "API Gateway Proxy integration"
+  - See: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format
+- Create an IAM Role for Lambda Execution
+  - See: https://docs.aws.amazon.com/lambda/latest/dg/with-s3-example-create-iam-role.html
+- Create a Lambda Function that replies to the API Gateway request
+  - See: https://docs.aws.amazon.com/de_de/lambda
+
 ## How to use
 
 ### Get the data
@@ -89,3 +102,8 @@ def lambda_handler(event, context):
 - You should now see the "Stage Editor" and a blue box on top that says "Invoke URL: <URL>"
 - Click the URL, a new window should open and you should see; "Hello from Lambda"
 - You just created a GET endpoint for your own API that calls your own Lambda function
+
+### Cleanup
+
+- Delete the Lambda Function
+- Delete the API Gateway

@@ -4,6 +4,18 @@ This Lambda function uses CloudWatch Events to tag newly created EC2 Instance wi
 
 ![Architecture](_img/lambda-tag-ec2.png)
 
+## Objective
+
+The final solution should be an AWS Lambda Function that tags new EC2 Instances with an "Owner" and a "Launched" Tag.
+
+- Create an IAM Role for Lambda Execution (including permissions to tag EC2 instances)
+  - Lambda IAM Role: https://docs.aws.amazon.com/lambda/latest/dg/with-s3-example-create-iam-role.html
+  - Tag EC2 Instances: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html
+- Create a Lambda Function that tags the EC2 Instances
+  - See: https://docs.aws.amazon.com/de_de/lambda
+- Use CloudWatch Events to invoke the Lambda Function
+  - See: https://docs.aws.amazon.com/lambda/latest/dg/invoking-lambda-function.html#supported-event-source-cloudwatch-events
+
 ## How to use
 
 ### Get the data
@@ -80,3 +92,9 @@ aws cloudformation deploy --stack-name <STACK_NAME> \
 - Make sure the Trigger is enabled and click "Add"
 - Your Lambda is finished now, click "Save"
 - You can now test the Lambda function by creating a new EC2 instance and check if it gets tagged with an "Owner" and "Launched" Tag
+
+### Cleanup
+
+- Delete the Lambda Function
+- Delete the IAM Role & the custom policy
+- Delete the CloudWatch Event (CloudWatch > Events > Rules)
