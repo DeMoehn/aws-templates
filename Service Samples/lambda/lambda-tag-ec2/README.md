@@ -1,4 +1,4 @@
-# Tag new EC2 Intance
+# Tag new EC2 Instances
 
 This Lambda function uses CloudWatch Events to tag newly created EC2 Instance with an "Owner" and a "Launched" Tag.
 

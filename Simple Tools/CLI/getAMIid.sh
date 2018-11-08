@@ -1,0 +1,1 @@
+aws ec2 describe-images --filters "Name=name,Values=amzn2-ami-hvm-2*-gp2" --query 'Images[*].{Name:Name,ImageId:ImageId}' --output table

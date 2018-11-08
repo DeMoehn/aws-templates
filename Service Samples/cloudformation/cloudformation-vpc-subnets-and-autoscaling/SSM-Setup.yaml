@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploys VPC-Endpoints needed for AWS Systems Manager (Base Stack "VPC_4Subnets_2SGs.yaml")
+
+# Resources go here
+Resources:
+
+  # Security Group
+  SecurityGroupSSM:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ssm-vpc-endpoint-sg
+      GroupDescription: "Access for SSM Agent"
+      VpcId: !ImportValue DefaultVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub 'ssm-vpc-endpoint'
+
+  # IAM Role for SSM Service
+  EC2SSMRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: ec2_ssm_role
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM # Standard AWS Policy for SSM
+  
+  RootInstanceProfile: 
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: ec2_ssm_role
+      Path: "/"
+      Roles: 
+        - Ref: EC2SSMRole
+
+  # VPC Endpoints
+  # - SSM -
+  VPCEndpointSSM:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      VpcEndpointType: Interface
+      VpcId: !ImportValue DefaultVPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      PrivateDnsEnabled: true
+      SubnetIds: 
+        - !ImportValue DefaultPrivateSubnet1
+        - !ImportValue DefaultPrivateSubnet2
+      SecurityGroupIds: 
+        - !Ref SecurityGroupSSM
+
+# - SSM-Messages -
+  VPCEndpointSSMMessages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      VpcEndpointType: Interface
+      VpcId: !ImportValue DefaultVPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssmmessages
+      PrivateDnsEnabled: true
+      SubnetIds: 
+        - !ImportValue DefaultPrivateSubnet1
+        - !ImportValue DefaultPrivateSubnet2
+      SecurityGroupIds: 
+        - !Ref SecurityGroupSSM
+
+  # - EC2 -
+  VPCEndpointEC2:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      VpcEndpointType: Interface
+      VpcId: !ImportValue DefaultVPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2
+      PrivateDnsEnabled: true
+      SubnetIds: 
+        - !ImportValue DefaultPrivateSubnet1
+        - !ImportValue DefaultPrivateSubnet2
+      SecurityGroupIds: 
+        - !Ref SecurityGroupSSM
+
+  # - EC2-Messages -
+  VPCEndpointEC2Messages:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      VpcEndpointType: Interface
+      VpcId: !ImportValue DefaultVPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
+      PrivateDnsEnabled: true
+      SubnetIds: 
+        - !ImportValue DefaultPrivateSubnet1
+        - !ImportValue DefaultPrivateSubnet2
+      SecurityGroupIds: 
+        - !Ref SecurityGroupSSM
+
+  # - S3 -
+  VPCEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      VpcEndpointType: Gateway
+      VpcId: !ImportValue DefaultVPC
+      RouteTableIds:
+        - !ImportValue DefaultPublicRouteTable
+        - !ImportValue DefaultPrivateRouteTable
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      PolicyDocument: !Sub |
+        {
+          "Statement": [
+            {
+                "Action": "*",
+                "Effect": "Allow",
+                "Resource": "*",
+                "Principal": "*"
+            }
+          ]
+        }
+
+# Output goes here        
+Outputs:
+  SecurityGroupSSM:
+    Description: SSM SecurityGroup
+    Value: !Ref SecurityGroupSSM
+  EC2SSMRole:
+    Description: IAM Role for EC2 to use SSM
+    Value: !Ref EC2SSMRole
+  VPCEndpointSSM:
+    Description: VPC SSM Endpoint
+    Value: !Ref  VPCEndpointSSM
+  VPCEndpointSSMMessages:
+    Description: VPC SSM-Messages Endpoint
+    Value: !Ref VPCEndpointSSMMessages
+  VPCEndpointEC2:
+    Description: EC2 Endpoint
+    Value: !Ref VPCEndpointEC2
+  VPCEndpointEC2Messages:
+    Description: EC2-Messages Endpoint
+    Value: !Ref VPCEndpointEC2Messages
+  VPCEndpointS3:
+    Description: S3 Endpoint
+    Value: !Ref VPCEndpointS3
